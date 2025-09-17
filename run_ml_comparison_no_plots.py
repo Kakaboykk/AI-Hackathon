@@ -13,14 +13,10 @@ from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error,
 import warnings
 warnings.filterwarnings('ignore')
 
-print("Starting Appliances Energy Prediction ML Comparison...")
-print("=" * 60)
+print("Running Appliances Energy Prediction: Model Comparison (RF, Linear, SVR)")
 
 # Load the dataset
-print("\n1. Loading the dataset...")
 df = pd.read_csv('energydata_complete.csv', index_col=0, parse_dates=True)
-print(f"Dataset shape: {df.shape}")
-print(f"Columns: {list(df.columns)[:5]}...")
 
 # Feature engineering function
 def create_ml_features(data, target_col='Appliances', lag_periods=[1, 2, 3, 6, 12, 24]):
@@ -62,24 +58,17 @@ def create_ml_features(data, target_col='Appliances', lag_periods=[1, 2, 3, 6, 1
     return df_ml
 
 # Create features for ML models
-print("\n2. Creating features...")
 df_ml = create_ml_features(df)
-print(f"Original dataset shape: {df.shape}")
-print(f"ML dataset shape: {df_ml.shape}")
-print(f"New features created: {df_ml.shape[1] - df.shape[1]}")
 
 # Remove rows with NaN values and prepare data
-print("\n3. Preparing data...")
 df_ml_clean = df_ml.dropna()
 feature_cols = [col for col in df_ml_clean.columns if col != 'Appliances']
 X_ml = df_ml_clean[feature_cols]
 y_ml = df_ml_clean['Appliances']
 
-print(f"Final dataset shape: {df_ml_clean.shape}")
-print(f"Number of features: {len(feature_cols)}")
+# silently prepare features and target
 
 # Temporal split: Use last 30 days for testing
-print("\n4. Splitting data...")
 test_size = 30 * 144  # 30 days * 144 samples per day (10-minute intervals)
 
 X_train = X_ml.iloc[:-test_size]
@@ -92,12 +81,9 @@ scaler_standard = StandardScaler()
 X_train_scaled = scaler_standard.fit_transform(X_train)
 X_test_scaled = scaler_standard.transform(X_test)
 
-print(f"Training set: {X_train.shape}, Test set: {X_test.shape}")
-print(f"Training period: {df_ml_clean.index[0]} to {df_ml_clean.index[-test_size-1]}")
-print(f"Test period: {df_ml_clean.index[-test_size]} to {df_ml_clean.index[-1]}")
+#
 
 # Initialize models
-print("\n5. Initializing models...")
 models = {
     'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
     'Linear Regression': LinearRegression(),
@@ -109,10 +95,7 @@ results = {}
 predictions = {}
 
 # Train all models and calculate metrics
-print("\n6. Training models...")
 for model_name, model in models.items():
-    print(f"\nTraining {model_name}...")
-    
     # Choose appropriate data (scaled for Linear Regression and SVR)
     if model_name in ['Linear Regression', 'SVR']:
         model.fit(X_train_scaled, y_train)
@@ -130,15 +113,9 @@ for model_name, model in models.items():
     
     results[model_name] = {'MAE': mae, 'MAPE': mape, 'MSE': mse, 'RMSE': rmse, 'R2': r2}
     predictions[model_name] = pred
-    
-    print(f"{model_name} Results:")
-    print(f"  MAE: {mae:.2f}")
-    print(f"  MAPE: {mape:.2f}%")
-    print(f"  RMSE: {rmse:.2f}")
-    print(f"  R²: {r2:.4f}")
 
 # Create results comparison table
-print("\n7. MODEL COMPARISON RESULTS")
+print("\nMODEL COMPARISON RESULTS")
 print("=" * 60)
 results_df = pd.DataFrame(results).T
 results_df = results_df.round(4)
@@ -155,50 +132,3 @@ for metric in ['MAE', 'MAPE', 'RMSE', 'R2']:
         best_score = results_df[metric].min()
     print(f"{metric}: {best_model} ({best_score:.4f})")
 
-# Feature importance analysis
-print("\n8. FEATURE IMPORTANCE ANALYSIS (Random Forest)")
-print("=" * 50)
-rf_model = models['Random Forest']
-feature_importance = rf_model.feature_importances_
-feature_names = X_train.columns
-importance_df = pd.DataFrame({'feature': feature_names, 'importance': feature_importance}).sort_values('importance', ascending=False)
-
-print("Top 10 Most Important Features:")
-for i, (_, row) in enumerate(importance_df.head(10).iterrows(), 1):
-    print(f"{i:2d}. {row['feature']:<25} {row['importance']:.4f}")
-
-# Save models
-print("\n9. Saving models...")
-import joblib
-joblib.dump(rf_model, 'best_energy_predictor_model.pkl')
-joblib.dump(scaler_standard, 'feature_scaler.pkl')
-print("Best model and scaler saved as:")
-print("• best_energy_predictor_model.pkl")
-print("• feature_scaler.pkl")
-
-# Final summary
-print("\n" + "=" * 60)
-print("FINAL SUMMARY")
-print("=" * 60)
-print("This analysis compared three machine learning approaches:")
-print("• Random Forest Regressor")
-print("• Linear Regression") 
-print("• Support Vector Regression (SVR)")
-print("\nKey findings:")
-print("• Feature engineering with lagged variables and rolling statistics")
-print("  significantly improved model performance")
-print("• Random Forest typically performs well due to its ability to capture")
-print("  non-linear relationships and feature interactions")
-print("• The models can be used for energy consumption forecasting and")
-print("  optimization in smart homes/buildings")
-
-best_r2_model = results_df['R2'].idxmax()
-best_r2_score = results_df['R2'].max()
-best_mae_model = results_df['MAE'].idxmin()
-best_mae_score = results_df['MAE'].min()
-
-print(f"\nBest overall model (R²): {best_r2_model} ({best_r2_score:.4f})")
-print(f"Most accurate model (MAE): {best_mae_model} ({best_mae_score:.2f})")
-print(f"Feature count used: {len(feature_cols)}")
-print(f"Test period: {len(y_test)} samples (30 days)")
-print("=" * 60)
